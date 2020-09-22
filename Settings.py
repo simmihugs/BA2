@@ -6,3 +6,4 @@ class Settings:
         self.sampling_spectral_N=8
         self.image_coordinates=[0,0,0.9]
         self.image_restriction=[[-0.3,0.3],[-0.3,0.3],0]
+
