@@ -3,6 +3,8 @@ import numpy
 import os #operating system
 #time
 from time import strftime
+#threading
+from threading import Thread
 #plotting
 import matplotlib.pyplot as plt
 from matplotlib.ticker import LinearLocator, FixedLocator, FormatStrFormatter
@@ -33,49 +35,18 @@ class Calculation:
         #x,y sampling step in accordance with FFT Restrictions
         self.d_x_step=(OpticalElementData.oe_samplingarea[0][1]-OpticalElementData.oe_samplingarea[0][0])/(2**Settings.sampling_FFT_N[0]-1)
         self.d_y_step=(OpticalElementData.oe_samplingarea[1][1]-OpticalElementData.oe_samplingarea[1][0])/(2**Settings.sampling_FFT_N[1]-1)
-        #Calculate Gaussian Beams for each Wavelength
-        self.calc_sampling_lambda=[] #Wavelengths sampled
-        self.calc_sampling_offsets=[]
-        self.calc_sampling_waistrad=[]
-        self.calc_sampling_E0=[]
+        #Initiate Arrays
+        self.calc_sampling_lambda=[None]*self.Settings.sampling_spectral_N #Wavelengths sampled
+        self.calc_sampling_offsets=[None]*self.Settings.sampling_spectral_N #Offsets
+        self.calc_sampling_waistrad=[None]*self.Settings.sampling_spectral_N #Waistrads
+        self.calc_sampling_E0=[None]*self.Settings.sampling_spectral_N #Field of Wavelength
         self.calc_Eopt_lambda_xy=numpy.zeros(([Settings.sampling_spectral_N, 2 ** Settings.sampling_FFT_N[0], 2 ** Settings.sampling_FFT_N[1]]), dtype=complex)
         self.calc_transmission_lambda_xy=numpy.zeros(([Settings.sampling_spectral_N, 2 ** Settings.sampling_FFT_N[0], 2 ** Settings.sampling_FFT_N[1]]), dtype=complex)
         self.calc_Eres_lambda_xy = numpy.zeros(([Settings.sampling_spectral_N, 2 ** Settings.sampling_FFT_N[0], 2 ** Settings.sampling_FFT_N[1]]),dtype=complex)
         #Sample the Intensity function
         #loop lambda
         for i in range (0,Settings.sampling_spectral_N):
-         #Get Lambda
-         self.calc_sampling_lambda.append(SourceData.source_samplingarea[0]+self.d_lambda_step*i)
-         #Offsets
-         self.calc_sampling_offsets.append([0,0,self.Calculate_z_offset(i)])
-         #Waistrad
-         self.calc_sampling_waistrad.append(self.Calculate_Waistrad(i))
-         #E_0(lambda) Field of Wavelengths
-         self.calc_sampling_E0.append(SourceData.source_spectrum_sympify.subs("x",self.calc_sampling_lambda[i]))
-         #loop x
-         for m in range(0,2**Settings.sampling_FFT_N[0]):
-             #loop y
-             for n in range(0,2**Settings.sampling_FFT_N[1]):
-                 #Calculate E(x,y,z_optic) in optical plane for each wavelength
-                 self.calc_Eopt_lambda_xy[i,m,n] = self.Calculate_Field(i,m,n)
-                 #Calculate transmission matrices
-                 x = OpticalElementData.oe_samplingarea[0][0] + self.d_x_step * m
-                 y = OpticalElementData.oe_samplingarea[1][0] + self.d_y_step * n
-                 self.calc_transmission_lambda_xy[i,m,n]=OpticalElementData.oe_transmissionfunction_sympify.subs([["x",x],["y",y]])
-         #Cut the Matrices and Calculate for each Wavelength
-         cutdim=max(2**Settings.sampling_FFT_N[1],2**Settings.sampling_FFT_N[0]) if Settings.sampling_FFT_N[0] < Settings.sampling_FFT_N[1] else min(2**Settings.sampling_FFT_N[1],2**Settings.sampling_FFT_N[0])
-         cutcondition=[1]*cutdim
-         E=numpy.compress(cutcondition, self.calc_Eopt_lambda_xy, axis=2)[i] #Field
-         T=numpy.compress(cutcondition,self.calc_transmission_lambda_xy,axis=2)[i] #Transmission
-         R=E*numpy.fft.fftn(T)
-         #Add to Resultplane
-         self.calc_Eres_lambda_xy[i,:,:]=R
-         #Create all the Intensityplots
-         self.PlotIntensity(self.PrepareForIntensityPlot(self.calc_Eopt_lambda_xy,self.d_x_step,self.d_y_step,self.OpticalElementData.oe_samplingarea[0][0],self.OpticalElementData.oe_samplingarea[1][0],i))
-         #Create all the Resultplots
-         self.PlotIntensity(self.RecalculateCoordinatesFFT(self.PrepareForIntensityPlot(self.calc_Eres_lambda_xy,self.d_x_step,self.d_y_step,self.OpticalElementData.oe_samplingarea[0][0],self.OpticalElementData.oe_samplingarea[1][0],i)))
-         #Create Beamplots
-         self.PlotBeams(i)
+            self.Calculate_for_Wavelength(i)
         # Plot Spectrum
         self.PlotSpectrum()
         # Save Data
@@ -241,3 +212,41 @@ class Calculation:
         e2=numpy.exp(-((x**2+y**2)*frac)/(W_0**2))
         res= complex(e1*e2)
         return res
+
+    def Calculate_for_Wavelength(self,wavelength):#as iterator
+        i=wavelength
+        # Sample the Intensity function
+        # Get Lambda
+        self.calc_sampling_lambda[i]=self.SourceData.source_samplingarea[0] + self.d_lambda_step * i
+        # Offsets
+        self.calc_sampling_offsets[i]=[0, 0, self.Calculate_z_offset(i)]
+        # Waistrad
+        self.calc_sampling_waistrad[i]=self.Calculate_Waistrad(i)
+        # E_0(lambda) Field of Wavelengths
+        self.calc_sampling_E0[i]=self.SourceData.source_spectrum_sympify.subs("x", self.calc_sampling_lambda[i])
+        # loop x
+        for m in range(0, 2 ** self.Settings.sampling_FFT_N[0]):
+            # loop y
+            for n in range(0, 2 ** self.Settings.sampling_FFT_N[1]):
+                # Calculate E(x,y,z_optic) in optical plane for each wavelength
+                self.calc_Eopt_lambda_xy[i, m, n] = self.Calculate_Field(i, m, n)
+                # Calculate transmission matrices
+                x = self.OpticalElementData.oe_samplingarea[0][0] + self.d_x_step * m
+                y = self.OpticalElementData.oe_samplingarea[1][0] + self.d_y_step * n
+                self.calc_transmission_lambda_xy[i, m, n] = self.OpticalElementData.oe_transmissionfunction_sympify.subs([["x", x], ["y", y]])
+        # Cut the Matrices and Calculate for each Wavelength
+        cutdim = max(2 ** self.Settings.sampling_FFT_N[1], 2 ** self.Settings.sampling_FFT_N[0]) if self.Settings.sampling_FFT_N[0] < self.Settings.sampling_FFT_N[1] else min(2 ** self.Settings.sampling_FFT_N[1], 2 ** self.Settings.sampling_FFT_N[0])
+        cutcondition = [1] * cutdim
+        E = numpy.compress(cutcondition, self.calc_Eopt_lambda_xy, axis=2)[i]  # Field
+        T = numpy.compress(cutcondition, self.calc_transmission_lambda_xy, axis=2)[i]  # Transmission
+        R = E * numpy.fft.fftn(T)
+        # Add to Resultplane
+        self.calc_Eres_lambda_xy[i, :, :] = R
+        # Create all the Intensityplots
+        self.PlotIntensity(self.PrepareForIntensityPlot(self.calc_Eopt_lambda_xy, self.d_x_step, self.d_y_step,self.OpticalElementData.oe_samplingarea[0][0],self.OpticalElementData.oe_samplingarea[1][0], i))
+        # Create all the Resultplots
+        self.PlotIntensity(self.RecalculateCoordinatesFFT(self.PrepareForIntensityPlot(self.calc_Eres_lambda_xy, self.d_x_step, self.d_y_step,self.OpticalElementData.oe_samplingarea[0][0],self.OpticalElementData.oe_samplingarea[1][0], i)))
+        # Create Beamplots
+        self.PlotBeams(i)
+        print(i)
+        pass
