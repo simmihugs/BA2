@@ -3,8 +3,6 @@ import numpy
 import os #operating system
 #time
 from time import strftime
-#threading
-from threading import Thread
 #plotting
 import matplotlib.pyplot as plt
 from matplotlib.ticker import LinearLocator, FixedLocator, FormatStrFormatter
@@ -47,6 +45,12 @@ class Calculation:
         #loop lambda
         for i in range (0,Settings.sampling_spectral_N):
             self.Calculate_for_Wavelength(i)
+            # Create all the Intensityplots
+            self.PlotIntensity(self.PrepareForIntensityPlot(self.calc_Eopt_lambda_xy, self.d_x_step, self.d_y_step,self.OpticalElementData.oe_samplingarea[0][0],self.OpticalElementData.oe_samplingarea[1][0], i))
+            # Create all the Resultplots
+            self.PlotIntensity(self.RecalculateCoordinatesFFT(self.PrepareForIntensityPlot(self.calc_Eres_lambda_xy, self.d_x_step, self.d_y_step,self.OpticalElementData.oe_samplingarea[0][0],self.OpticalElementData.oe_samplingarea[1][0], i)))
+            # Create Beamplots
+            self.PlotBeams(i)
         # Plot Spectrum
         self.PlotSpectrum()
         # Save Data
@@ -92,13 +96,14 @@ class Calculation:
         x,y,z,l,OptOrRes=xyzlambda_array
         z=numpy.array(z)
         fig = plt.figure()
-        ax = Axes3D(fig)
+        ax = Axes3D(fig,elev=self.Settings.plotting_angles[0],azim=self.Settings.plotting_angles[1])
         ax.set_title("Intensity for Wavelenghth"+ str(l))
         ax.set_xlabel('x-axis (cm)', fontweight='bold')
         ax.set_ylabel('y-axis (cm)', fontweight='bold')
         ax.set_zlabel('Intensity', fontweight='bold')
         ax.plot_trisurf([xi*100 for xi in x], [yi*100 for yi in y], z,cmap=cm.jet)
         path=self.Directory +("/Intensity_OPT/" if OptOrRes else "/Intensity_RES/")+str(self.calc_sampling_lambda[l]*10**9)
+
         try:
             plt.savefig(path+"nm.png")
         except:
@@ -119,11 +124,18 @@ class Calculation:
         x,y,z,l,OptOrRes=xyzlambda_array
         dist=self.Settings.image_coordinates[2]-self.OpticalElementData.oe_coordinates[2]
         la=self.calc_sampling_lambda[l]
-        for i in range(len(x)):
-            x[i] = -dist * la* x[i]
-        for k in range(len(y)):
-            y[k]= - dist * la * y[k]
+        x=[-dist * la* xi for xi in x]
+        y = [-dist * la * yi for yi in y]
         return [x,y,z,l,False]
+
+    def RecalculateCoordinatesFFT_inv(self,xyzlambda_array):
+        x,y,z,l,OptOrRes=xyzlambda_array
+        dist=self.Settings.image_coordinates[2]-self.OpticalElementData.oe_coordinates[2]
+        la=self.calc_sampling_lambda[l]
+        x=[xi/(-dist * la) for xi in x]
+        y = [yi/(-dist * la) for yi in y]
+        return [x,y,z,l,True]
+
 
     def PlotBeams(self,wavelength):
         fig = plt.figure()
@@ -234,13 +246,6 @@ class Calculation:
                 x = self.OpticalElementData.oe_samplingarea[0][0] + self.d_x_step * m
                 y = self.OpticalElementData.oe_samplingarea[1][0] + self.d_y_step * n
                 self.calc_transmission_lambda_xy[i, m, n] = self.OpticalElementData.oe_transmissionfunction_sympify.subs([["x", x], ["y", y]])
-                self.calc_Eres_lambda_xy[wavelength,m,n]=self.calc_Eopt_lambda_xy[i, m, n]*numpy.fft.fftn(self.calc_transmission_lambda_xy[i, m, n])
-
-        # Create all the Intensityplots
-        self.PlotIntensity(self.PrepareForIntensityPlot(self.calc_Eopt_lambda_xy, self.d_x_step, self.d_y_step,self.OpticalElementData.oe_samplingarea[0][0],self.OpticalElementData.oe_samplingarea[1][0], i))
-        # Create all the Resultplots
-        self.PlotIntensity(self.RecalculateCoordinatesFFT(self.PrepareForIntensityPlot(self.calc_Eres_lambda_xy, self.d_x_step, self.d_y_step,self.OpticalElementData.oe_samplingarea[0][0],self.OpticalElementData.oe_samplingarea[1][0], i)))
-        # Create Beamplots
-        self.PlotBeams(i)
+                self.calc_Eres_lambda_xy[i,m,n]=self.calc_Eopt_lambda_xy[i, m, n]*numpy.fft.fftn(self.calc_transmission_lambda_xy[i, m, n])
         print(i)
         pass

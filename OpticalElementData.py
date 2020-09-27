@@ -5,7 +5,7 @@ class OpticalElementData:
     def __init__(self):
         pass
     #Variables
-    oe_transmissionfunction="1"
+    oe_transmissionfunction="-sin(1000000*x)"
     #Coordinates of Optical Element
     oe_coordinates=[0,0,0.2]
     #Area that should be sampled (geometry) Default only x,y values needed, z for further upgrades
