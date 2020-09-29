@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import LinearLocator, FixedLocator, FormatStrFormatter
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
+#multiprocessing
+from multiprocessing import Process,Manager
 #my classes
 from SourceData import SourceData
 from OpticalElementData import OpticalElementData
@@ -44,10 +46,7 @@ class Calculation:
         self.calc_transmission_lambda_xy=numpy.zeros(([Settings.sampling_spectral_N, 2 ** Settings.sampling_FFT_N[0], 2 ** Settings.sampling_FFT_N[1]]), dtype=complex)#transmission Matrix
         self.calc_Eres_lambda_xy = numpy.zeros(([Settings.sampling_spectral_N, 2 ** Settings.sampling_FFT_N[0], 2 ** Settings.sampling_FFT_N[1]]),dtype=complex) #resulting Field
         self.calc_IntensityResult=numpy.zeros([2 ** Settings.sampling_FFT_N[0], 2 ** Settings.sampling_FFT_N[1],2]) #Resulting Intensity after coherence 0=Opt 1=Res
-        #Calculate
-        self.Calculation()
-        #Plot
-        self.Plot_All_SaveAll()
+
 
 
     def CreateFolder(self):
@@ -147,7 +146,7 @@ class Calculation:
         return -coordinate/(dist*la)
 
 
-    def PlotBeams(self,wavelength):
+    def Plot_Beams(self,wavelength):
         "Plot beam propagation in profile"
         fig = plt.figure()
         axes= fig.add_axes([0.2,0.1,0.8,0.8]) #x is z axis, y is Radius
@@ -338,10 +337,22 @@ class Calculation:
         pass
 
     def Calculation(self):
+        for i in range(0, self.Settings.sampling_spectral_N):
+            self.Calculate_for_Wavelength(i, self.Settings.sampling_OptOrRes)
+            print("Calculating " + str(self.calc_sampling_lambda[i] * 10 ** 9) + "nm")
         "Main Calculation Function"
+        ''' NON FUNCTIONAL THREADING IDEA
+        p=[]
         for i in range (0,self.Settings.sampling_spectral_N):
-            self.Calculate_for_Wavelength(i,self.Settings.sampling_OptOrRes)
-            print("Calculating "+str(self.calc_sampling_lambda[i]*10**9)+"nm")
+            print("Calculating " + str(i))
+            if __name__ == '__main__':
+                with Manager() as manager:
+                    k=manager.__init_subclass__(Calculation)
+                p.append(Process(target=self.Calculate_for_Wavelength,args=(k,i,self.Settings.sampling_OptOrRes)))
+                #self.Calculate_for_Wavelength(i,self.Settings.sampling_OptOrRes)
+                p[i].start()
+        [pi.join() for pi in p]
+        '''
         pass
 
     def Plot_All_SaveAll(self):
@@ -350,7 +361,7 @@ class Calculation:
             print("Plotting "+str(self.calc_sampling_lambda[i]*10**9)+"nm")
             self.Plot_Direction(i,self.Settings.sampling_OptOrRes)
             # Create Beamplots
-            self.PlotBeams(i)
+            self.Plot_Beams(i)
         # Plot Spectrum
         print("Plotting Spectrum")
         self.PlotSpectrum()
