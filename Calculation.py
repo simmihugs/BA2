@@ -72,7 +72,8 @@ class Calculation:
             plt.savefig(self.Directory+"/Spectrum.png")
         except:
             self.CreateFolder()
-            plt.savefig(self.Directory)
+            plt.savefig(self.Directory+"/Spectrum.png")
+            
         plt.close(fig)
     def PrepareForIntensityPlot(self,E,dx,dy,x_start,y_start,wavelength,OptorRes):
         "Prepares Plotting Data according to plane: (Fieldmatrix,x_step,y_step,x_start,y_start,wavelenght(iterator),Opt=True Res=False"
