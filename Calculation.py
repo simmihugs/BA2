@@ -44,19 +44,10 @@ class Calculation:
         self.calc_transmission_lambda_xy=numpy.zeros(([Settings.sampling_spectral_N, 2 ** Settings.sampling_FFT_N[0], 2 ** Settings.sampling_FFT_N[1]]), dtype=complex)#transmission Matrix
         self.calc_Eres_lambda_xy = numpy.zeros(([Settings.sampling_spectral_N, 2 ** Settings.sampling_FFT_N[0], 2 ** Settings.sampling_FFT_N[1]]),dtype=complex) #resulting Field
         self.calc_IntensityResult=numpy.zeros([2 ** Settings.sampling_FFT_N[0], 2 ** Settings.sampling_FFT_N[1],2]) #Resulting Intensity after coherence 0=Opt 1=Res
-        #Sample the Intensity function
-        #loop lambda (Main calculation function)
-        for i in range (0,Settings.sampling_spectral_N):
-            self.Calculate_for_Wavelength(i,False)
-            # Create Intensityplots
-            self.Plot_Direction(i,False)
-            # Create Beamplots
-            self.PlotBeams(i)
-        # Plot Spectrum
-        self.PlotSpectrum()
-        # Save Data
-        self.SaveInputData()
-        self.Calculate_Coherence(False)
+        #Calculate
+        self.Calculation()
+        #Plot
+        self.Plot_All_SaveAll()
 
 
     def CreateFolder(self):
@@ -282,7 +273,6 @@ class Calculation:
                 #Calculate transmission function
                 self.calc_transmission_lambda_xy[i, m, n] = self.OpticalElementData.oe_transmissionfunction_sympify.subs([["x", x], ["y", y]])
                 self.calc_Eres_lambda_xy[i,m,n]=self.calc_Eopt_lambda_xy[i, m, n]*numpy.fft.fftn(self.calc_transmission_lambda_xy[i, m, n])
-        print(i)
         pass
 
     def Plot_Direction(self,wavelength,OptorRes):
@@ -345,5 +335,30 @@ class Calculation:
             content.append("\n"+str([x[i],y[i],z[i]]))
         file.writelines(content)
         file.close()
-
         pass
+
+    def Calculation(self):
+        "Main Calculation Function"
+        for i in range (0,self.Settings.sampling_spectral_N):
+            self.Calculate_for_Wavelength(i,self.Settings.sampling_OptOrRes)
+            print("Calculating "+str(self.calc_sampling_lambda[i]*10**9)+"nm")
+        pass
+
+    def Plot_All_SaveAll(self):
+        "Main Plotting function"
+        for i in range(0, self.Settings.sampling_spectral_N):
+            print("Plotting "+str(self.calc_sampling_lambda[i]*10**9)+"nm")
+            self.Plot_Direction(i,self.Settings.sampling_OptOrRes)
+            # Create Beamplots
+            self.PlotBeams(i)
+        # Plot Spectrum
+        print("Plotting Spectrum")
+        self.PlotSpectrum()
+        # Save Data
+        print("Saving")
+        self.SaveInputData()
+        print("Calculating Result")
+        self.Calculate_Coherence(self.Settings.sampling_OptOrRes)
+        pass
+
+
